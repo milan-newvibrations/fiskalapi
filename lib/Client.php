@@ -385,22 +385,29 @@ class Client
      * @param boolean $rawCertificate      Determines if certificate is provided in raw form or path.
      *
      * @return $this
+     * @throws \Exception Exception in case certificate cannot be parsed.
      */
-    private function initCertificate($providedCertificate, $pass, $rawCertificate = false)
+     private function initCertificate($providedCertificate, $pass, $rawCertificate = false)
     {
         $certificateContent = $providedCertificate;
         if ($rawCertificate === false) {
             $certificateContent = $this->readCertificateFromDisk($providedCertificate);
         }
-
-        openssl_pkcs12_read($certificateContent, $certificate, $pass);
+	     
+        if (!@openssl_pkcs12_read($certificateContent, $certificate, $pass)){
+	    //magento sometimes strip trailing null- add it and try again	
+            $certificateContent = trim ($certificateContent, "\0") ."\0";
+            if (!@openssl_pkcs12_read($certificateContent, $certificate, $pass)){
+                  throw new \Exception('initCertificate - Can not parse certificate', 2);    
+            }
+       }
         $this->setCertificate($certificate);
         $this->setPrivateKeyResource(openssl_pkey_get_private($this->getCertificatePrivateKey(), $pass));
         $this->setPublicCertificateData(openssl_x509_parse($this->getCertificateCert()));
 
         return $this;
-    }
-
+    }		
+    
     /**
      * Init root certificate path.
      *
